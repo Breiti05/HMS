@@ -10,6 +10,11 @@ use Illuminate\Http\Request;
 
 class ScanController extends Controller
 {
+    public function show()
+    {
+        return view('scan');
+    }
+
     public function store(Request $request, SiteMaterialService $service): JsonResponse
     {
         $data = $request->validate(['payload' => ['required', 'string', 'max:300']]);

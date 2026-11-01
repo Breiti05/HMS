@@ -1,9 +1,131 @@
 @import 'tailwindcss';
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
+
+:root {
+    --bg: #0a1020;
+    --panel: #111a2e;
+    --panel-2: #16223b;
+    --line: #22314f;
+    --text: #e6edf7;
+    --muted: #8a9bb8;
+    --accent: #38bdf8;
+    --ok: #34d399;
+    --warn: #fbbf24;
+    --bad: #f87171;
+}
+
+body {
+    background:
+        linear-gradient(rgba(56, 189, 248, 0.035) 1px, transparent 1px) 0 0 / 32px 32px,
+        linear-gradient(90deg, rgba(56, 189, 248, 0.035) 1px, transparent 1px) 0 0 / 32px 32px,
+        var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+}
+
+/* Gerüst */
+.shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+@media (max-width: 800px) { .shell { grid-template-columns: 1fr; } }
+.rail { background: rgba(10, 16, 32, 0.92); border-right: 1px solid var(--line); padding: 1.25rem 1rem; }
+.brand { font-weight: 700; letter-spacing: 0.18em; color: var(--accent); font-size: 1.1rem; }
+.brand small { display: block; letter-spacing: 0.04em; font-weight: 400; color: var(--muted); font-size: 0.72rem; margin-top: 0.2rem; }
+.nav { margin-top: 1.5rem; display: grid; gap: 0.25rem; }
+.nav a, .nav button { display: block; width: 100%; text-align: left; padding: 0.55rem 0.75rem; border-radius: 4px; color: var(--muted); border-left: 2px solid transparent; font-size: 0.92rem; }
+.nav a:hover, .nav button:hover { background: var(--panel); color: var(--text); }
+.nav a.aktiv { background: var(--panel); color: var(--text); border-left-color: var(--accent); }
+.main { padding: 1.75rem 2rem; max-width: 1280px; }
+@media (max-width: 800px) { .main { padding: 1rem; } }
+.titel { font-size: 1.35rem; font-weight: 600; letter-spacing: 0.02em; }
+.unter { color: var(--muted); font-size: 0.85rem; margin-top: 0.15rem; }
+.raster { display: grid; gap: 1rem; margin-top: 1.25rem; }
+.raster-4 { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.raster-2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+
+/* Kachel mit Eckmarken */
+.kachel { position: relative; background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.1rem; --c: var(--accent); }
+.kachel::before, .kachel::after { content: ''; position: absolute; width: 12px; height: 12px; border: 2px solid var(--c); }
+.kachel::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; border-top-left-radius: 6px; }
+.kachel::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; border-bottom-right-radius: 6px; }
+.kachel.warn { --c: var(--warn); }
+.kachel.ok { --c: var(--ok); }
+.kachel.bad { --c: var(--bad); }
+.kachel .etikett { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); }
+.kachel .zahl { font-size: 2.4rem; font-weight: 700; line-height: 1.1; margin-top: 0.35rem; font-variant-numeric: tabular-nums; }
+.kachel .zahl.warn { color: var(--warn); }
+a.kachel:hover { border-color: var(--c); }
+
+/* Abschnitt */
+.abschnitt { margin-top: 1.75rem; }
+.abschnitt > h2 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted); margin-bottom: 0.7rem; }
+
+/* Lagerraster */
+.regal { display: grid; gap: 0.6rem; }
+.platz { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 0.6rem 0.7rem; min-height: 5.2rem; position: relative; overflow: hidden; }
+.platz::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--line); }
+.platz[data-status='ok']::before { background: var(--ok); }
+.platz[data-status='knapp']::before { background: var(--warn); }
+.platz[data-status='knapp'] { border-color: rgba(251, 191, 36, 0.45); }
+.platz .code { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); }
+.platz .inhalt { font-size: 0.78rem; color: var(--text); margin-top: 0.3rem; line-height: 1.35; }
+.platz .leer { color: var(--muted); font-size: 0.75rem; margin-top: 0.3rem; }
+
+/* Balken in Segmenten */
+.balken { height: 10px; background: #0b1426; border: 1px solid var(--line); border-radius: 2px; position: relative; overflow: hidden; }
+.balken > i { display: block; height: 100%; background: var(--accent); }
+.balken::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), var(--panel) calc(10% - 2px) 10%); }
+.balken.ok > i { background: var(--ok); }
+
+/* Tabellen, Formulare, Knöpfe */
+.tabelle { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.tabelle th { text-align: left; font-weight: 500; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); }
+.tabelle td { padding: 0.55rem 0.5rem; border-bottom: 1px solid rgba(34, 49, 79, 0.6); }
+.feld { display: grid; gap: 0.25rem; font-size: 0.8rem; color: var(--muted); }
+.feld input, .feld select { background: #0b1426; border: 1px solid var(--line); border-radius: 4px; color: var(--text); padding: 0.5rem 0.6rem; font-size: 0.92rem; width: 100%; }
+.feld input:focus, .feld select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.formzeile { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.7rem; align-items: end; }
+.knopf { background: var(--accent); color: #04121f; font-weight: 600; border-radius: 4px; padding: 0.55rem 1rem; font-size: 0.9rem; }
+.knopf:hover { filter: brightness(1.1); }
+.knopf.leise { background: transparent; color: var(--text); border: 1px solid var(--line); }
+.fehler { color: var(--bad); font-size: 0.82rem; margin-top: 0.3rem; }
+.hinweis { background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.4); color: var(--ok); border-radius: 4px; padding: 0.5rem 0.8rem; margin-top: 1rem; font-size: 0.88rem; }
+.marke { display: inline-block; font-size: 0.7rem; padding: 0.1rem 0.5rem; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+.marke.ok { color: var(--ok); border-color: rgba(52, 211, 153, 0.5); }
+.marke.warn { color: var(--warn); border-color: rgba(251, 191, 36, 0.5); }
+
+/* Aufgaben */
+.aufgabe { display: flex; align-items: center; gap: 0.7rem; padding: 0.55rem 0; border-bottom: 1px solid rgba(34, 49, 79, 0.6); }
+.aufgabe button.haken { width: 22px; height: 22px; border: 2px solid var(--line); border-radius: 4px; display: grid; place-items: center; color: transparent; flex: none; }
+.aufgabe.erledigt button.haken { background: var(--ok); border-color: var(--ok); color: #04121f; }
+.aufgabe.erledigt .text { color: var(--muted); text-decoration: line-through; }
+
+/* Kanban */
+.spalten { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+.spalte { background: rgba(17, 26, 46, 0.6); border: 1px solid var(--line); border-radius: 6px; padding: 0.8rem; min-height: 12rem; }
+.spalte > h2 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted); margin-bottom: 0.7rem; display: flex; justify-content: space-between; }
+.karte { background: var(--panel-2); border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: 4px; padding: 0.65rem 0.75rem; margin-bottom: 0.6rem; font-size: 0.88rem; }
+.karte form { margin-top: 0.5rem; display: flex; gap: 0.4rem; }
+
+/* Scanner */
+#scanner { width: 100%; max-width: 480px; aspect-ratio: 1; background: #05090f; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.ergebnis { margin-top: 1rem; padding: 0.8rem 1rem; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); }
+.ergebnis.ok { border-color: var(--ok); }
+.ergebnis.fehler-box { border-color: var(--bad); }
+
+/* Anmeldung */
+.gast { display: grid; place-items: center; min-height: 100vh; padding: 1rem; }
+.gast .kachel { width: 100%; max-width: 420px; padding: 1.5rem; }
+.gast form { display: grid; gap: 0.8rem; margin-top: 1rem; }
+
+/* Etikett: druckfreundlich, hell */
+.etikettdruck { background: #fff; color: #000; max-width: 420px; margin: 1rem auto; padding: 1rem; border: 2px solid #000; border-radius: 4px; }
+.etikettdruck dl { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.8rem; margin-top: 0.8rem; font-size: 0.95rem; }
+.etikettdruck dt { color: #444; }
+.etikettdruck dd { font-weight: 600; }
+.etikettdruck .qr svg { width: 100%; height: auto; }
+@media print { body { background: #fff !important; } .rail, .kein-druck { display: none !important; } .shell { display: block; } .main { padding: 0; } }

@@ -26,12 +26,14 @@ class Site extends Model
     /** Fortschritt in Prozent (0–100) aus den abgehakten Aufgaben. */
     public function progress(): int
     {
-        $total = $this->tasks()->count();
-
-        if ($total === 0) {
-            return 0;
+        if ($this->relationLoaded('tasks')) {
+            $total = $this->tasks->count();
+            $done = $this->tasks->whereNotNull('done_at')->count();
+        } else {
+            $total = $this->tasks()->count();
+            $done = $this->tasks()->whereNotNull('done_at')->count();
         }
 
-        return (int) round($this->tasks()->whereNotNull('done_at')->count() / $total * 100);
+        return $total === 0 ? 0 : (int) round($done / $total * 100);
     }
 }

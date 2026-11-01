@@ -1,58 +1,64 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# HMS – Handwerker-Management-System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Lager, Kanban-Nachschub, Baustellen mit Aufgaben und Material-QR-Etiketten
+für Handwerksbetriebe. Mandantenfähig (mehrere Betriebe in einer Installation).
+Laravel 13, PHP 8.3, Blade, Tailwind 4, Pest.
 
-## About Laravel
-
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Entwickeln
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+cp .env.example .env && php artisan key:generate
+touch database/database.sqlite
+php artisan migrate --seed      # Demodaten: demo@hms.test / demo-passwort
+npm install && npm run build
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Tests (testgetrieben: erst der Test, dann der Code):
 
-## Contributing
+```bash
+php artisan test        # oder ./vendor/bin/pest
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Aufbau
 
-## Code of Conduct
+- **Mandanten:** jede Tabelle hat `tenant_id`; ein globaler Scope filtert auf den
+  Betrieb des angemeldeten Benutzers. Ohne Betriebskontext liefert jede Abfrage
+  nichts (fail-closed). In Jobs/Befehlen: `TenantContext::run($tenantId, fn () => …)`.
+  Fremdschlüssel laufen über `(tenant_id, id)`, die Datenbank verhindert also
+  Verweise auf Datensätze anderer Betriebe.
+- **Buchungen:** alles läuft über `App\Services\StockService`. Bewegungen sind
+  unveränderlich (Korrektur nur per Gegenbuchung). Unter Mindestbestand entsteht
+  automatisch eine Kanban-Karte.
+- **QR-Etikett:** `HMS1|Baustellennummer|Materialnummer|Menge|Token`. Beim
+  Verladescan (`/scan`) wird das Etikett gegen die Buchung geprüft, der Ausgang
+  gebucht und das Material als verladen markiert. Jedes Etikett gilt nur einmal.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Auf Hostinger bereitstellen (SSH)
 
-## Security Vulnerabilities
+1. MySQL-Datenbank in hPanel anlegen (Name, Benutzer, Kennwort notieren).
+2. PHP 8.3 für die Domain wählen. Den Document Root der Domain auf `public/` des
+   Projekts setzen (hPanel → Websites → Erweitert).
+3. Per SSH: `git clone https://github.com/Breiti05/HMS.git` in das Domain-Verzeichnis.
+4. `composer install --no-dev --optimize-autoloader`
+5. `cp .env.example .env`, dann in `.env` eintragen: `APP_ENV=production`,
+   `APP_DEBUG=false`, `APP_URL`, `DB_CONNECTION=mysql`, `DB_HOST`, `DB_DATABASE`,
+   `DB_USERNAME`, `DB_PASSWORD`. Zugangsdaten nur dort, nie im Repository.
+6. `php artisan key:generate && php artisan migrate --force`
+7. Frontend: `npm ci && npm run build` (falls Node auf dem Server fehlt, lokal
+   bauen und `public/build/` hochladen).
+8. `php artisan config:cache && php artisan route:cache && php artisan view:cache`
+9. HTTPS erzwingen (hPanel → Sicherheit → SSL). Erster Betrieb: `/registrieren`.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Update: `git pull`, `composer install --no-dev`, `php artisan migrate --force`,
+`npm run build`, Caches neu bauen.
 
-## License
+## Offene Punkte (aus dem Datenmodell-Review)
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- Rollen und Rechte (Policies); `users.role` ist bisher nur gespeichert.
+- Mengen als Decimal/Ganzzahl statt Float führen.
+- Belegnummernkreise pro Betrieb, Kunden/Lieferanten, Preise (für Einkauf,
+  Kalkulation, Verkauf).
+- Reservierung von Material, Storno/Neudruck von Etiketten, Chargen/Seriennummern.
+- Parallelitätstests gegen MariaDB (lokal läuft SQLite).
