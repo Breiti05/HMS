@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\MaterialLabelController;
+use App\Http\Controllers\ScanController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -14,4 +16,6 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/abmelden', [LoginController::class, 'destroy'])->name('logout');
     Route::view('/', 'dashboard')->name('dashboard');
+    Route::post('/scan', [ScanController::class, 'store'])->name('scan');
+    Route::get('/material/{material}/etikett', [MaterialLabelController::class, 'show'])->name('material.label');
 });

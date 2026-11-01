@@ -4,14 +4,6 @@ use App\Models\Article;
 use App\Models\Tenant;
 use App\Models\User;
 
-function betrieb(string $name): array
-{
-    $tenant = Tenant::create(['name' => $name]);
-    $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'owner']);
-
-    return [$tenant, $user];
-}
-
 it('legt bei der Registrierung Betrieb und Inhaber an und meldet an', function () {
     $this->post('/registrieren', [
         'company' => 'Müller Haustechnik',
