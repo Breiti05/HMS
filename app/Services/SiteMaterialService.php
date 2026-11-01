@@ -9,7 +9,6 @@ use App\Models\SiteMaterial;
 use App\Models\StorageLocation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class SiteMaterialService
 {
@@ -21,12 +20,16 @@ class SiteMaterialService
             throw new \InvalidArgumentException('Die Menge muss größer als null sein.');
         }
 
+        if ($site->tenant_id != $article->tenant_id || $site->tenant_id != $from->tenant_id) {
+            throw new \LogicException('Baustelle, Artikel und Lagerplatz gehören zu verschiedenen Betrieben.');
+        }
+
         return SiteMaterial::create([
             'site_id' => $site->id,
             'article_id' => $article->id,
             'storage_location_id' => $from->id,
             'quantity' => $quantity,
-            'token' => Str::random(32),
+            'token' => bin2hex(random_bytes(16)),
         ]);
     }
 
@@ -58,6 +61,10 @@ class SiteMaterialService
                 || $material->article->number !== $articleNumber
                 || (string) $material->quantityLabel() !== $quantity) {
                 throw new InvalidScan('Das Etikett stimmt nicht mit der Buchung überein.');
+            }
+
+            if ($material->site->status !== 'active') {
+                throw new InvalidScan('Die Baustelle ist nicht aktiv.');
             }
 
             if ($material->loaded_at) {

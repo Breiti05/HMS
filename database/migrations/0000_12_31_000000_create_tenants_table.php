@@ -13,19 +13,10 @@ return new class extends Migration
             $table->string('name');
             $table->timestamps();
         });
-
-        Schema::table('users', function (Blueprint $table) {
-            $table->foreignId('tenant_id')->nullable()->after('id')->constrained()->cascadeOnDelete();
-            $table->string('role')->default('worker')->after('password');
-        });
     }
 
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('tenant_id');
-            $table->dropColumn('role');
-        });
         Schema::dropIfExists('tenants');
     }
 };

@@ -140,9 +140,10 @@ it('nimmt Scans über die Schnittstelle an und antwortet mit JSON', function () 
 
 it('erlaubt Scans nur angemeldeten Benutzern', function () {
     $m = $this->material->assign($this->baustelle, $this->rohr, $this->platz, 40);
+    $payload = $m->qrPayload();
     auth()->logout();
 
-    $this->postJson(route('scan'), ['payload' => $m->qrPayload()])->assertUnauthorized();
+    $this->postJson(route('scan'), ['payload' => $payload])->assertUnauthorized();
 });
 
 it('trennt Baustellen und Material nach Betrieb', function () {

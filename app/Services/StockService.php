@@ -12,7 +12,9 @@ use App\Models\StorageLocation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
+use LogicException;
 
 /**
  * Alle Bestandsänderungen laufen hier durch: Bestand, Protokoll und
@@ -23,6 +25,7 @@ class StockService
     public function receive(Article $article, StorageLocation $location, float $quantity, ?string $note = null): void
     {
         $this->assertPositive($quantity);
+        $this->assertSameTenant($article, $location);
 
         DB::transaction(function () use ($article, $location, $quantity, $note) {
             $this->change($article, $location, $quantity);
@@ -39,6 +42,7 @@ class StockService
         string $type = 'issue',
     ): void {
         $this->assertPositive($quantity);
+        $this->assertSameTenant($article, $location);
 
         DB::transaction(function () use ($article, $location, $quantity, $note, $site, $type) {
             $this->change($article, $location, -$quantity);
@@ -50,12 +54,28 @@ class StockService
     public function transfer(Article $article, StorageLocation $from, StorageLocation $to, float $quantity): void
     {
         $this->assertPositive($quantity);
+        $this->assertSameTenant($article, $from);
+        $this->assertSameTenant($article, $to);
+
+        if ($from->id === $to->id) {
+            throw new InvalidArgumentException('Quelle und Ziel der Umlagerung müssen verschieden sein.');
+        }
 
         DB::transaction(function () use ($article, $from, $to, $quantity) {
+            // Beide Zeilen immer in gleicher Reihenfolge sperren, sonst drohen Deadlocks (A→B und B→A).
+            $this->ensureLevel($article, $from);
+            $this->ensureLevel($article, $to);
+            StockLevel::where('article_id', $article->id)
+                ->whereIn('storage_location_id', [$from->id, $to->id])
+                ->orderBy('storage_location_id')
+                ->lockForUpdate()
+                ->get();
+
+            $group = (string) Str::uuid();
             $this->change($article, $from, -$quantity);
-            $this->log($article, $from, 'transfer_out', $quantity);
+            $this->log($article, $from, 'transfer_out', $quantity, null, null, $group);
             $this->change($article, $to, $quantity);
-            $this->log($article, $to, 'transfer_in', $quantity);
+            $this->log($article, $to, 'transfer_in', $quantity, null, null, $group);
         });
     }
 
@@ -84,12 +104,14 @@ class StockService
 
     private function change(Article $article, StorageLocation $location, float $delta): void
     {
+        $this->ensureLevel($article, $location);
+
         $level = StockLevel::where('article_id', $article->id)
             ->where('storage_location_id', $location->id)
             ->lockForUpdate()
-            ->first();
+            ->firstOrFail();
 
-        $current = $level ? (float) $level->quantity : 0.0;
+        $current = (float) $level->quantity;
         $new = round($current + $delta, 3);
 
         if ($new < 0) {
@@ -99,18 +121,23 @@ class StockService
             ));
         }
 
-        if ($level) {
-            $level->update(['quantity' => $new]);
-        } else {
-            StockLevel::create([
-                'article_id' => $article->id,
-                'storage_location_id' => $location->id,
-                'quantity' => $new,
-            ]);
-        }
+        $level->update(['quantity' => $new]);
     }
 
-    private function log(Article $article, StorageLocation $location, string $type, float $quantity, ?string $note = null, ?Site $site = null): void
+    /** Legt die Bestandszeile an, falls es sie noch nicht gibt, damit sie gesperrt werden kann. */
+    private function ensureLevel(Article $article, StorageLocation $location): void
+    {
+        DB::table('stock_levels')->insertOrIgnore([
+            'tenant_id' => $article->tenant_id,
+            'article_id' => $article->id,
+            'storage_location_id' => $location->id,
+            'quantity' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function log(Article $article, StorageLocation $location, string $type, float $quantity, ?string $note = null, ?Site $site = null, ?string $group = null): void
     {
         StockMovement::create([
             'article_id' => $article->id,
@@ -120,27 +147,43 @@ class StockService
             'quantity' => $quantity,
             'user_id' => Auth::id(),
             'note' => $note,
+            'transfer_group' => $group,
         ]);
     }
 
-    /** Unter Mindestbestand: genau eine offene Kanban-Karte pro Artikel. */
+    /** Unter Mindestbestand: höchstens eine offene oder bestellte Kanban-Karte pro Artikel. */
     private function checkMinimum(Article $article): void
     {
-        $min = (float) $article->min_stock;
-        $total = $this->totalQuantity($article);
+        // Artikelzeile als Serialisierungspunkt sperren, damit parallele Buchungen keine Doppelkarten erzeugen.
+        $locked = Article::whereKey($article->id)->lockForUpdate()->first();
+        $min = (float) $locked->min_stock;
+        $total = $this->totalQuantity($locked);
 
         if ($min <= 0 || $total >= $min) {
             return;
         }
 
-        $hasOpen = KanbanCard::where('article_id', $article->id)->where('status', 'open')->exists();
+        $pending = KanbanCard::where('article_id', $locked->id)
+            ->whereIn('status', ['open', 'ordered'])
+            ->exists();
 
-        if (! $hasOpen) {
-            KanbanCard::create([
-                'article_id' => $article->id,
-                'status' => 'open',
-                'quantity' => round($min * 2 - $total, 3),
-            ]);
+        if ($pending) {
+            return;
+        }
+
+        KanbanCard::create([
+            'article_id' => $locked->id,
+            'status' => 'open',
+            'quantity' => $locked->reorder_qty !== null
+                ? (float) $locked->reorder_qty
+                : round(max($min * 2 - $total, $min), 3),
+        ]);
+    }
+
+    private function assertSameTenant(Article $article, StorageLocation $location): void
+    {
+        if ($article->tenant_id != $location->tenant_id) {
+            throw new LogicException('Artikel und Lagerplatz gehören zu verschiedenen Betrieben.');
         }
     }
 
